@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>繁花 第14集</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #000; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif; overflow: hidden; }
+        .player-container { position: relative; width: 100vw; height: 100vh; background: #000; }
+        video { width: 100%; height: 100%; object-fit: contain; }
+        
+        /* 顶部栏 */
+        .top-bar { position: absolute; top: 0; left: 0; right: 0; height: 44px; background: linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 100%); display: flex; align-items: center; padding: 0 12px; z-index: 100; opacity: 0; transition: opacity 0.3s; }
+        .player-container:hover .top-bar, .player-container.paused .top-bar { opacity: 1; }
+        .back-btn { color: #fff; font-size: 20px; padding: 8px; cursor: pointer; }
+        .video-title { color: #fff; font-size: 15px; margin-left: 8px; flex: 1; }
+        .vip-btn { background: linear-gradient(135deg, #FFD56E, #FFAA3E); color: #000; padding: 5px 14px; border-radius: 14px; font-size: 13px; font-weight: 600; margin-left: auto; }
+        
+        /* 底部控制栏 */
+        .controls { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(0deg, rgba(0,0,0,0.75) 0%, transparent 100%); padding: 8px 15px 20px; z-index: 100; opacity: 0; transition: opacity 0.3s; }
+        .player-container:hover .controls, .player-container.paused .controls { opacity: 1; }
+        
+        .progress-container { width: 100%; margin-bottom: 12px; }
+        .time-info { display: flex; justify-content: space-between; color: rgba(255,255,255,0.7); font-size: 11px; margin-bottom: 6px; }
+        .progress-bar { width: 100%; height: 3px; background: rgba(255,255,255,0.25); border-radius: 2px; cursor: pointer; position: relative; }
+        .progress { height: 100%; background: linear-gradient(90deg, #FFD56E, #FFAA3E); border-radius: 2px; width: 0%; position: relative; transition: width 0.1s; }
+        .progress-handle { position: absolute; right: -5px; top: 50%; transform: translateY(-50%); width: 10px; height: 10px; background: #FFD56E; border-radius: 50%; box-shadow: 0 0 8px rgba(255,213,110,0.6); }
+        
+        .control-row { display: flex; align-items: center; gap: 12px; }
+        .play-btn { color: #fff; font-size: 24px; cursor: pointer; width: 32px; text-align: center; }
+        .next-btn { color: #fff; font-size: 20px; cursor: pointer; }
+        .danmaku-toggle { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 6px 10px; border-radius: 16px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        .danmaku-input-wrapper { flex: 1; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); border-radius: 18px; padding: 7px 15px; display: flex; align-items: center; }
+        .danmaku-input { background: transparent; border: none; color: #fff; font-size: 13px; outline: none; flex: 1; }
+        .danmaku-input::placeholder { color: rgba(255,255,255,0.5); }
+        .right-controls { display: flex; gap: 12px; color: #fff; font-size: 13px; margin-left: auto; }
+        .right-controls span { cursor: pointer; white-space: nowrap; }
+        
+        /* 贴片广告 */
+        .ad-overlay { position: absolute; bottom: 140px; left: 20px; right: 20px; background: linear-gradient(135deg, rgba(25,25,25,0.98), rgba(15,15,15,0.98)); backdrop-filter: blur(25px); border: 2px solid rgba(255,213,110,0.3); border-radius: 18px; padding: 20px 24px; display: none; z-index: 95; box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
+        .ad-overlay.show { display: block; animation: slideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .ad-content { display: flex; align-items: center; gap: 20px; }
+        
+        /* 品牌LOGO区域 */
+        .ad-logo { width: 75px; height: 75px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; flex-shrink: 0; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.2); position: relative; overflow: hidden; }
+        .ad-logo.luckin { background: linear-gradient(135deg, #0066CC, #0052A3); color: #fff; }
+        .ad-logo.luckin::before { content: '瑞幸'; font-size: 16px; font-weight: 700; }
+        .ad-logo.moutai { background: linear-gradient(135deg, #C41E3A, #A01729); color: #FFD700; border: 2px solid #FFD700; }
+        .ad-logo.moutai::before { content: '茅台'; font-size: 16px; font-weight: 700; }
+        
+        .ad-text { flex: 1; }
+        .ad-title { color: #fff; font-size: 19px; font-weight: 600; margin-bottom: 7px; letter-spacing: 0.5px; line-height: 1.3; }
+        .ad-subtitle { color: rgba(255,255,255,0.7); font-size: 13px; font-weight: 400; }
+        
+        .send-danmaku-btn { background: linear-gradient(135deg, #FF6B6B, #FF4757); color: #fff; border: none; padding: 12px 24px; border-radius: 22px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; box-shadow: 0 4px 15px rgba(255,71,87,0.4); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .send-danmaku-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255,71,87,0.5); background: linear-gradient(135deg, #FF7979, #FF5565); }
+        .send-danmaku-btn:active { transform: translateY(0); }
+        
+        /* 弹幕 */
+        .danmaku-container { position: absolute; top: 50px; left: 0; right: 0; bottom: 120px; pointer-events: none; overflow: hidden; z-index: 50; }
+        .danmaku-item { position: absolute; white-space: nowrap; font-size: 22px; font-weight: 600; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.8), -1px -1px 2px rgba(0,0,0,0.8); animation: danmaku-move 10s linear; }
+        .danmaku-item.brand { background: linear-gradient(135deg, rgba(255,213,110,0.25), rgba(255,170,62,0.25)); padding: 7px 14px; border-radius: 16px; border: 1.5px solid rgba(255,213,110,0.4); backdrop-filter: blur(8px); }
+        @keyframes danmaku-move { from { transform: translateX(100vw); } to { transform: translateX(-100%); } }
+        
+        /* 暂停指示器 */
+        .pause-indicator { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 70px; color: rgba(255,255,255,0.9); opacity: 0; pointer-events: none; z-index: 85; transition: opacity 0.3s; text-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        .player-container.paused .pause-indicator { opacity: 1; }
+    </style>
+</head>
+<body>
+    <div class="player-container" id="playerContainer">
+        <video id="video" src="fanhua.mp4" preload="auto"></video>
+        
+        <div class="top-bar">
+            <div class="back-btn">‹</div>
+            <div class="video-title">繁花 第14集</div>
+            <div class="vip-btn">开通VIP会员</div>
+        </div>
+        
+        <div class="danmaku-container" id="danmakuContainer"></div>
+        <div class="pause-indicator">⏸</div>
+        
+        <div class="ad-overlay" id="adOverlay">
+            <div class="ad-content">
+                <div class="ad-logo" id="adLogo"></div>
+                <div class="ad-text">
+                    <div class="ad-title" id="adTitle">广告文案</div>
+                    <div class="ad-subtitle" id="adSubtitle">品牌名称</div>
+                </div>
+                <button class="send-danmaku-btn" id="sendDanmaku">
+                    <span id="danmakuText">一键发弹幕</span>
+                </button>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div class="progress-container">
+                <div class="time-info">
+                    <span id="currentTime">0:00</span>
+                    <span id="duration">0:00</span>
+                </div>
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress" id="progress">
+                        <div class="progress-handle"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="control-row">
+                <div class="play-btn" id="playBtn">▶</div>
+                <div class="next-btn">⏭</div>
+                <div class="danmaku-toggle">弹幕</div>
+                <div class="danmaku-toggle">设置</div>
+                <div class="danmaku-input-wrapper">
+                    <input type="text" class="danmaku-input" placeholder="发个友善的弹幕吧~" id="customDanmaku">
+                </div>
+                <div class="right-controls">
+                    <span>普通话</span>
+                    <span>字幕</span>
+                    <span>倍速</span>
+                    <span>720P</span>
+                    <span>选集</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const playBtn = document.getElementById('playBtn');
+        const progress = document.getElementById('progress');
+        const progressBar = document.getElementById('progressBar');
+        const currentTime = document.getElementById('currentTime');
+        const duration = document.getElementById('duration');
+        const adOverlay = document.getElementById('adOverlay');
+        const playerContainer = document.getElementById('playerContainer');
+        const danmakuContainer = document.getElementById('danmakuContainer');
+        const sendDanmakuBtn = document.getElementById('sendDanmaku');
+        const customDanmakuInput = document.getElementById('customDanmaku');
+        
+        const ads = [
+            { 
+                time: 15, 
+                logoClass: 'luckin',
+                title: '有些相遇，只能品一次', 
+                subtitle: '瑞幸咖啡·敬过往', 
+                danmaku: '这杯咖啡，敬过往 ☕', 
+                duration: 5 
+            },
+            { 
+                time: 60, 
+                logoClass: 'moutai',
+                title: '人生如酒，苦尽甘来', 
+                subtitle: '贵州茅台·敬有缘无分', 
+                danmaku: '敬有缘无分 🍶', 
+                duration: 5 
+            }
+        ];
+        
+        let currentAd = null;
+        let adShown = [false, false];
+        
+        function togglePlay() {
+            if (video.paused) {
+                video.play();
+                playBtn.textContent = '⏸';
+                playerContainer.classList.remove('paused');
+            } else {
+                video.pause();
+                playBtn.textContent = '▶';
+                playerContainer.classList.add('paused');
+            }
+        }
+        
+        playBtn.addEventListener('click', togglePlay);
+        
+        let lastTap = 0;
+        video.addEventListener('click', (e) => {
+            const now = new Date().getTime();
+            const tapLength = now - lastTap;
+            if (tapLength < 300 && tapLength > 0) {
+                togglePlay();
+            }
+            lastTap = now;
+        });
+        
+        video.addEventListener('timeupdate', () => {
+            const percent = (video.currentTime / video.duration) * 100;
+            progress.style.width = percent + '%';
+            currentTime.textContent = formatTime(video.currentTime);
+            checkAds();
+        });
+        
+        video.addEventListener('loadedmetadata', () => {
+            duration.textContent = formatTime(video.duration);
+        });
+        
+        progressBar.addEventListener('click', (e) => {
+            const rect = progressBar.getBoundingClientRect();
+            const percent = (e.clientX - rect.left) / rect.width;
+            video.currentTime = percent * video.duration;
+        });
+        
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return mins + ':' + secs.toString().padStart(2, '0');
+        }
+        
+        function checkAds() {
+            ads.forEach((ad, index) => {
+                if (!adShown[index] && video.currentTime >= ad.time && video.currentTime < ad.time + ad.duration) {
+                    showAd(ad, index);
+                }
+            });
+            if (currentAd !== null) {
+                const ad = ads[currentAd];
+                if (video.currentTime >= ad.time + ad.duration) {
+                    hideAd();
+                }
+            }
+        }
+        
+        function showAd(ad, index) {
+            if (currentAd === index) return;
+            currentAd = index;
+            adShown[index] = true;
+            
+            const logoEl = document.getElementById('adLogo');
+            logoEl.className = 'ad-logo ' + ad.logoClass;
+            
+            document.getElementById('adTitle').textContent = ad.title;
+            document.getElementById('adSubtitle').textContent = ad.subtitle;
+            document.getElementById('danmakuText').textContent = '一键发送：' + ad.danmaku;
+            adOverlay.classList.add('show');
+            
+            setTimeout(() => addDanmaku('这段太虐了😭'), 600);
+            setTimeout(() => addDanmaku('爷青结'), 1400);
+        }
+        
+        function hideAd() {
+            adOverlay.classList.remove('show');
+            currentAd = null;
+        }
+        
+        sendDanmakuBtn.addEventListener('click', () => {
+            if (currentAd !== null) {
+                const ad = ads[currentAd];
+                addDanmaku(ad.danmaku, true);
+                setTimeout(() => addDanmaku(ad.danmaku, true), 900);
+                setTimeout(() => addDanmaku(ad.danmaku, true), 1700);
+            }
+        });
+        
+        customDanmakuInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && customDanmakuInput.value.trim()) {
+                addDanmaku(customDanmakuInput.value);
+                customDanmakuInput.value = '';
+            }
+        });
+        
+        function addDanmaku(text, isBrand = false) {
+            const danmaku = document.createElement('div');
+            danmaku.className = 'danmaku-item' + (isBrand ? ' brand' : '');
+            danmaku.textContent = text;
+            danmaku.style.top = Math.random() * 65 + 10 + '%';
+            danmakuContainer.appendChild(danmaku);
+            setTimeout(() => danmaku.remove(), 10000);
+        }
+        
+        function autoDanmaku() {
+            const messages = ['这剧太好看了', '演技在线', '我哭了', '氛围感拉满', '这场景绝了'];
+            if (!video.paused && Math.random() > 0.65) {
+                addDanmaku(messages[Math.floor(Math.random() * messages.length)]);
+            }
+        }
+        
+        setInterval(autoDanmaku, 3500);
+    </script>
+</body>
+</html>
