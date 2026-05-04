@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>繁花 第14集</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #000; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif; overflow: hidden; }
+        .player-container { position: relative; width: 100vw; height: 100vh; background: #000; display: flex; align-items: center; justify-content: center; }
+        video { max-width: 100%; max-height: 100%; object-fit: contain; }
+        
+        /* 顶部栏 */
+        .top-bar { position: absolute; top: 0; left: 0; right: 0; height: 44px; background: linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 100%); display: flex; align-items: center; padding: 0 12px; z-index: 100; opacity: 0; transition: opacity 0.3s; }
+        .player-container:hover .top-bar, .player-container.paused .top-bar { opacity: 1; }
+        .back-btn { color: #fff; font-size: 20px; padding: 8px; cursor: pointer; }
+        .video-title { color: #fff; font-size: 15px; margin-left: 8px; flex: 1; }
+        .vip-btn { background: linear-gradient(135deg, #FFD56E, #FFAA3E); color: #000; padding: 5px 14px; border-radius: 14px; font-size: 13px; font-weight: 600; margin-left: auto; }
+        
+        /* 底部控制栏 */
+        .controls { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(0deg, rgba(0,0,0,0.75) 0%, transparent 100%); padding: 8px 15px 20px; z-index: 100; opacity: 0; transition: opacity 0.3s; }
+        .player-container:hover .controls, .player-container.paused .controls { opacity: 1; }
+        
+        .progress-container { width: 100%; margin-bottom: 12px; }
+        .time-info { display: flex; justify-content: space-between; color: rgba(255,255,255,0.7); font-size: 11px; margin-bottom: 6px; }
+        .progress-bar { width: 100%; height: 3px; background: rgba(255,255,255,0.25); border-radius: 2px; cursor: pointer; position: relative; }
+        .progress { height: 100%; background: linear-gradient(90deg, #FFD56E, #FFAA3E); border-radius: 2px; width: 0%; position: relative; transition: width 0.1s; }
+        .progress-handle { position: absolute; right: -5px; top: 50%; transform: translateY(-50%); width: 10px; height: 10px; background: #FFD56E; border-radius: 50%; box-shadow: 0 0 8px rgba(255,213,110,0.6); }
+        
+        .control-row { display: flex; align-items: center; gap: 12px; }
+        .play-btn { color: #fff; font-size: 24px; cursor: pointer; width: 32px; text-align: center; }
+        .next-btn { color: #fff; font-size: 20px; cursor: pointer; }
+        .danmaku-toggle { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 6px 10px; border-radius: 16px; font-size: 13px; cursor: pointer; }
+        .danmaku-toggle.active { background: #FFD56E; color: #000; }
+        .danmaku-input-wrapper { flex: 1; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); border-radius: 18px; padding: 7px 15px; }
+        .danmaku-input { background: transparent; border: none; color: #fff; font-size: 13px; outline: none; width: 100%; }
+        .danmaku-input::placeholder { color: rgba(255,255,255,0.5); }
+        .right-controls { display: flex; gap: 12px; color: #fff; font-size: 13px; margin-left: auto; }
+        .right-controls span { cursor: pointer; white-space: nowrap; }
+        
+        /* 弹幕容器 - 顶部1/5区域 */
+        .danmaku-container { position: absolute; top: 50px; left: 0; right: 0; height: 20%; pointer-events: none; overflow: hidden; z-index: 50; }
+        .danmaku-item { position: absolute; white-space: nowrap; font-size: 22px; font-weight: 600; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.8), -1px -1px 2px rgba(0,0,0,0.8); animation: danmaku-move 10s linear; }
+        .danmaku-item.brand { background: linear-gradient(135deg, rgba(255,213,110,0.3), rgba(255,170,62,0.3)); padding: 7px 14px; border-radius: 16px; border: 1.5px solid rgba(255,213,110,0.5); animation: danmaku-move-special 10s linear; }
+        @keyframes danmaku-move { from { transform: translateX(100vw); } to { transform: translateX(-100%); } }
+        @keyframes danmaku-move-special { 
+            0% { transform: translateX(100vw) scale(1); }
+            10% { transform: translateX(90vw) scale(1.15); }
+            20% { transform: translateX(80vw) scale(1); }
+            30% { transform: translateX(70vw) scale(1.1); }
+            40% { transform: translateX(60vw) scale(1); }
+            100% { transform: translateX(-100%) scale(1); }
+        }
+        
+        /* 暂停指示器 */
+        .pause-indicator { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 70px; color: rgba(255,255,255,0.9); opacity: 0; pointer-events: none; z-index: 85; transition: opacity 0.3s; }
+        .player-container.paused .pause-indicator { opacity: 1; }
+        
+        /* 暂停广告 - 4:3居中 */
+        .pause-ad { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 480px; height: 360px; background: #f0f0f0; border-radius: 8px; display: none; z-index: 95; box-shadow: 0 8px 32px rgba(0,0,0,0.6); background-image: url('pause-ad.jpg'); background-size: cover; background-position: center; }
+        .player-container.paused .pause-ad { display: block; }
+        .pause-ad-placeholder { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #666; font-size: 14px; }
+        .pause-ad-placeholder .icon { font-size: 48px; margin-bottom: 10px; color: #999; }
+        
+        /* 贴片广告 - 左下角小图 */
+        .corner-ad { position: absolute; bottom: 100px; left: 20px; width: 300px; height: 120px; background: rgba(0,0,0,0.85); border-radius: 12px; display: none; z-index: 90; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.4); background-image: url('corner-ad.png'); background-size: cover; background-position: center; }
+        .corner-ad.show { display: flex; animation: slideIn 0.5s ease-out; }
+        @keyframes slideIn { from { transform: translateX(-120%); } to { transform: translateX(0); } }
+        
+        .corner-ad-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 15px; gap: 12px; }
+        .ad-image-placeholder { width: 90px; height: 90px; background: linear-gradient(135deg, #ddd, #ccc); border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #666; font-size: 12px; text-align: center; }
+        .ad-text-area { flex: 1; }
+        .ad-brand { color: #FFD56E; font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+        .ad-slogan { color: #fff; font-size: 13px; line-height: 1.3; margin-bottom: 8px; }
+        .send-btn { background: linear-gradient(135deg, #FF6B6B, #FF4757); color: #fff; border: none; padding: 6px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+        
+        /* 帮助提示 */
+        .help-tip { position: absolute; top: 60px; right: 20px; background: rgba(0,0,0,0.9); color: #FFD56E; padding: 12px 16px; border-radius: 8px; font-size: 12px; z-index: 200; max-width: 280px; line-height: 1.6; border: 1px solid rgba(255,215,0,0.3); }
+        .close-help { position: absolute; top: 8px; right: 8px; color: #FFD56E; cursor: pointer; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <div class="player-container" id="playerContainer">
+        <video id="video" src="fanhua.MP4" preload="auto"></video>
+        
+        <div class="top-bar">
+            <div class="back-btn">‹</div>
+            <div class="video-title">繁花 第14集</div>
+            <div class="vip-btn">开通VIP会员</div>
+        </div>
+        
+        <div class="danmaku-container" id="danmakuContainer"></div>
+        <div class="pause-indicator">⏸</div>
+        
+        <!-- 暂停广告 4:3 -->
+        <div class="pause-ad">
+            <div class="pause-ad-placeholder">
+                <div class="icon">📸</div>
+                <div>暂停广告位 (480x360)</div>
+                <div style="font-size: 12px; margin-top: 8px;">替换文件: pause-ad.jpg</div>
+            </div>
+        </div>
+        
+        <!-- 贴片广告 - 左下角 -->
+        <div class="corner-ad" id="cornerAd">
+            <div class="corner-ad-placeholder">
+                <div class="ad-image-placeholder">
+                    品牌<br>LOGO<br>90x90
+                </div>
+                <div class="ad-text-area">
+                    <div class="ad-brand" id="adBrand">品牌名称</div>
+                    <div class="ad-slogan" id="adSlogan">广告文案</div>
+                    <button class="send-btn" id="sendDanmaku">一键发弹幕</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div class="progress-container">
+                <div class="time-info">
+                    <span id="currentTime">0:00</span>
+                    <span id="duration">0:00</span>
+                </div>
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress" id="progress">
+                        <div class="progress-handle"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="control-row">
+                <div class="play-btn" id="playBtn">▶</div>
+                <div class="next-btn">⏭</div>
+                <div class="danmaku-toggle active" id="danmakuToggle">弹幕</div>
+                <div class="danmaku-toggle">设置</div>
+                <div class="danmaku-input-wrapper">
+                    <input type="text" class="danmaku-input" placeholder="发个友善的弹幕吧~" id="customDanmaku">
+                </div>
+                <div class="right-controls">
+                    <span>普通话</span>
+                    <span>字幕</span>
+                    <span>倍速</span>
+                    <span>720P</span>
+                    <span>选集</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="help-tip" id="helpTip">
+            <div class="close-help" onclick="document.getElementById('helpTip').style.display='none'">×</div>
+            <strong>📌 自定义广告图片</strong><br>
+            • 暂停广告: pause-ad.jpg (480x360)<br>
+            • 贴片广告: corner-ad.png (300x120)<br>
+            放在HTML同目录即可自动加载
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const playBtn = document.getElementById('playBtn');
+        const progress = document.getElementById('progress');
+        const progressBar = document.getElementById('progressBar');
+        const currentTime = document.getElementById('currentTime');
+        const duration = document.getElementById('duration');
+        const cornerAd = document.getElementById('cornerAd');
+        const playerContainer = document.getElementById('playerContainer');
+        const danmakuContainer = document.getElementById('danmakuContainer');
+        const sendDanmakuBtn = document.getElementById('sendDanmaku');
+        const customDanmakuInput = document.getElementById('customDanmaku');
+        const danmakuToggle = document.getElementById('danmakuToggle');
+        
+        let danmakuEnabled = true;
+        
+        const ads = [
+            { 
+                time: 15, 
+                brand: '瑞幸咖啡',
+                slogan: '有些相遇，只能品一次', 
+                danmaku: '这杯咖啡，敬过往 ☕', 
+                duration: 5 
+            },
+            { 
+                time: 60, 
+                brand: '贵州茅台',
+                slogan: '人生如酒，苦尽甘来', 
+                danmaku: '敬有缘无分 🍶', 
+                duration: 5 
+            }
+        ];
+        
+        let currentAd = null;
+        let adShown = [false, false];
+        
+        // 弹幕开关
+        danmakuToggle.addEventListener('click', () => {
+            danmakuEnabled = !danmakuEnabled;
+            danmakuToggle.classList.toggle('active');
+            if (!danmakuEnabled) {
+                danmakuContainer.innerHTML = '';
+            }
+        });
+        
+        function togglePlay() {
+            if (video.paused) {
+                video.play();
+                playBtn.textContent = '⏸';
+                playerContainer.classList.remove('paused');
+            } else {
+                video.pause();
+                playBtn.textContent = '▶';
+                playerContainer.classList.add('paused');
+            }
+        }
+        
+        playBtn.addEventListener('click', togglePlay);
+        
+        let lastTap = 0;
+        video.addEventListener('click', (e) => {
+            const now = new Date().getTime();
+            const tapLength = now - lastTap;
+            if (tapLength < 300 && tapLength > 0) {
+                togglePlay();
+            }
+            lastTap = now;
+        });
+        
+        video.addEventListener('timeupdate', () => {
+            const percent = (video.currentTime / video.duration) * 100;
+            progress.style.width = percent + '%';
+            currentTime.textContent = formatTime(video.currentTime);
+            checkAds();
+        });
+        
+        video.addEventListener('loadedmetadata', () => {
+            duration.textContent = formatTime(video.duration);
+        });
+        
+        progressBar.addEventListener('click', (e) => {
+            const rect = progressBar.getBoundingClientRect();
+            const percent = (e.clientX - rect.left) / rect.width;
+            video.currentTime = percent * video.duration;
+        });
+        
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return mins + ':' + secs.toString().padStart(2, '0');
+        }
+        
+        function checkAds() {
+            ads.forEach((ad, index) => {
+                if (!adShown[index] && video.currentTime >= ad.time && video.currentTime < ad.time + ad.duration) {
+                    showAd(ad, index);
+                }
+            });
+            if (currentAd !== null) {
+                const ad = ads[currentAd];
+                if (video.currentTime >= ad.time + ad.duration) {
+                    hideAd();
+                }
+            }
+        }
+        
+        function showAd(ad, index) {
+            if (currentAd === index) return;
+            currentAd = index;
+            adShown[index] = true;
+            
+            document.getElementById('adBrand').textContent = ad.brand;
+            document.getElementById('adSlogan').textContent = ad.slogan;
+            cornerAd.classList.add('show');
+            
+            setTimeout(() => addDanmaku('这段太虐了😭'), 600);
+            setTimeout(() => addDanmaku('爷青结'), 1400);
+            setTimeout(() => addDanmaku('演技绝了'), 2200);
+        }
+        
+        function hideAd() {
+            cornerAd.classList.remove('show');
+            currentAd = null;
+        }
+        
+        sendDanmakuBtn.addEventListener('click', () => {
+            if (currentAd !== null) {
+                const ad = ads[currentAd];
+                addDanmaku(ad.danmaku, true);
+                setTimeout(() => addDanmaku(ad.danmaku, true), 500);
+                setTimeout(() => addDanmaku(ad.danmaku, true), 1000);
+                setTimeout(() => addDanmaku(ad.danmaku, true), 1500);
+            }
+        });
+        
+        customDanmakuInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && customDanmakuInput.value.trim()) {
+                addDanmaku(customDanmakuInput.value);
+                customDanmakuInput.value = '';
+            }
+        });
+        
+        function addDanmaku(text, isBrand = false) {
+            if (!danmakuEnabled) return;
+            
+            const danmaku = document.createElement('div');
+            danmaku.className = 'danmaku-item' + (isBrand ? ' brand' : '');
+            danmaku.textContent = text;
+            danmaku.style.top = Math.random() * 80 + '%';
+            danmakuContainer.appendChild(danmaku);
+            setTimeout(() => danmaku.remove(), 10000);
+        }
+        
+        // 高密度自动弹幕
+        function autoDanmaku() {
+            const messages = [
+                '这剧太好看了', '演技在线', '我哭了', '氛围感拉满', '这场景绝了',
+                '爷青结', '这段太虐了', '导演牛逼', '服化道满分', '台词绝了',
+                '这个镜头美哭', '音乐太配了', '演员都好帅', '看了三遍', '细节满满',
+                '编剧天才', '这季封神', '每一帧都是壁纸', '值得二刷', '太上头了'
+            ];
+            if (!video.paused && danmakuEnabled && Math.random() > 0.4) {
+                addDanmaku(messages[Math.floor(Math.random() * messages.length)]);
+            }
+        }
+        
+        setInterval(autoDanmaku, 1500);
+        
+        setTimeout(() => {
+            const tip = document.getElementById('helpTip');
+            if (tip) {
+                tip.style.opacity = '0';
+                setTimeout(() => tip.style.display = 'none', 300);
+            }
+        }, 15000);
+    </script>
+</body>
+</html>
